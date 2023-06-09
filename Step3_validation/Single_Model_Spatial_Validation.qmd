@@ -1,0 +1,239 @@
+---
+title: "Single_Model_Validation"
+author: "Pu"
+format: 
+  html:
+    fig-dpi: 300
+    fig-width: 7
+    fig-height: 5
+    code-fold: true
+    toc: true
+    toc-depth: 3
+---
+
+
+
+# 1 Input-preprocessing
+
+## 1.1 load necessary packages
+
+```{R include=FALSE}
+# load package
+library(readxl)
+library(xlsx)
+library(cluster)
+library(tidyverse)
+library(quantreg)
+library(Metrics)
+library(factoextra)
+```
+
+
+
+# 2 Model validation
+
+**Model verification is divided into national verification and county verification. ** Experimental data for country-level validation includes 217 countries from 1990-2020. Experimental data for county-level validation includes 9 countries at varying intervals from 1990-2020
+
+## 2.1 Level-0 validation
+
+
+### function：Accuracy_Rsq_RMSE_MAE_RE_reorder()
+
+
+```{R}
+# single year accuracy
+# Function: Accuracy_Rsq_RMSE_MAE_RE()
+# Input: synthetic data, census data, year
+# Output: list of Rsq, RMSE, MAE, RE
+
+Accuracy_Rsq_RMSE_MAE_RE = function(full,census,year){
+
+
+  list <- c()
+
+  fit <- lm(full ~ census)
+  summary <- summary(fit)
+  list = append( list, summary$r.squared)
+
+  # RMSE、MAE
+  rmse = rmse(full, census)
+  mae = mae(full, census)
+  list = append( list,rmse)
+  list = append( list,mae)
+
+  # RE(Relative Entropy)
+  p_full = ecdf(full) 
+  p_census = ecdf(census)
+  relativeEntrop = function(probDensity1, probDensity2) {
+    return(sum(
+      log(probDensity1 ^ probDensity1) - log(probDensity2 ^ probDensity1)
+    ))}
+  RelaEntropy_full <- relativeEntrop(p_census(census), p_full(full))
+  list = append( list, RelaEntropy_full)
+
+
+  list_tidy = round(list, digits = 4)
+  names(list_tidy) <- c("R^2","RMSE","MAE","RE")
+  return(list_tidy)
+}
+
+Accuracy_Rsq_RMSE_MAE_RE_reorder = function(full,census,year){
+
+
+  list <- c()
+
+  # R^2
+  fit <- lm(census ~ full) # Only modified here
+  summary <- summary(fit)
+  list = append( list, summary$r.squared)
+
+  # RMSE、MAE
+  rmse = rmse(census,full)# Only modified here
+  mae = mae(census,full)# Only modified here
+  list = append( list,rmse)
+  list = append( list,mae)
+
+  # RE(Relative Entropy)
+  p_full = ecdf(full) 
+  p_census = ecdf(census)
+  relativeEntrop = function(probDensity1, probDensity2) {
+    return(sum(
+      log(probDensity1 ^ probDensity1) - log(probDensity2 ^ probDensity1)
+    ))}
+  RelaEntropy_full <- relativeEntrop(p_census(census), p_full(full))
+  list = append( list, RelaEntropy_full)
+
+
+  list_tidy = round(list, digits = 4)
+  names(list_tidy) <- c("R^2","RMSE","MAE","RE")
+  return(list_tidy)
+}
+
+```
+
+
+### GetSingleModelValidation()
+
+```{R}
+# 1990 to 2020
+GetSingleModelValidation = function(in_path,out_path){
+  
+  # read in the dataframe
+  df_model = data.frame(read_excel(in_path, sheet = 'Year1990to2020'))
+  df_census = data.frame(read_excel(in_path, sheet = 'UN_1990to2020'))
+  View(df_model)
+  View(df_census)
+   
+  # prepare the df 
+  Accuracy_df = data.frame(matrix(ncol = 1, nrow = 4))
+  
+  # Validate per year
+  for (i in 1:31) {
+    
+    full = as.vector(df_model[,c(i+1)])
+    census = as.vector(df_census[,c(i+1)])
+  
+     # Call the precision calculation function
+    Accuracy_list = Accuracy_Rsq_RMSE_MAE_RE_reorder(full,census,i+1989)
+
+     # Get new column names
+    col_name = colnames(df_model)[i+1]
+    
+     # save column data to data frame
+    Accuracy_df = cbind(Accuracy_df,Accuracy_list)
+    
+     # Rename
+    colnames(Accuracy_df)[ncol(Accuracy_df)] = col_name
+  }
+  
+  # store the accuracy dataframe
+  Accuracy_df = Accuracy_df[,-c(1)]
+  
+  # check the Accuracy_df
+  View(Accuracy_df)
+  
+  # save the Accuracy_df
+  write.xlsx(Accuracy_df, out_path, sheetName = paste0("AfQrMore0_Accuracy_90to20"), 
+                append = FALSE)
+  
+}
+```
+
+
+### Call the verification function
+
+```{R}
+in_path = "E:/Out_pop/PopCount_more0_afqr/Af_Qr_clust_more0_1990to2020_Globe.xlsx"
+out_path = paste0("F:/Code/R_file/2022_12/Country_cluster/",
+                  "/validate_output/Accuracy_more0_AfQr_90to20_Globe.xlsx")
+
+GetSingleModelValidation(in_path,out_path)
+
+```
+
+
+## 2.2 Level-2 validation
+
+
+### GetSingleModelValidation_l2()
+
+```{R}
+# 1990 to 2020
+GetSingleModelValidation_l2 = function(in_path,out_path){
+  
+ # Get the sheet names
+  sheet_names <- excel_sheets(in_path)
+  print(sheet_names)
+
+  # prepare the df 
+  Accuracy_df = data.frame(matrix(ncol = 1, nrow = 4))
+  
+  # Validate per year
+  for (i in 1:length(sheet_names)) {
+    year = as.numeric(substr(sheet_names[i],nchar(sheet_names[i])-3, nchar(sheet_names[i])))
+    print(paste0("The process df year: ",year))
+    
+    df = data.frame(read_excel(in_path, sheet = sheet_names[i]))
+    
+    # check the NA,and remove the row
+    df <- na.omit(df)
+
+    full = as.vector(df$af_more0_sum)
+    census = as.vector(df$Census)
+  
+    # Call the precision calculation function
+    Accuracy_list = Accuracy_Rsq_RMSE_MAE_RE_reorder(full,census,year)
+
+    # Get new column names
+    col_name = paste0("Af_l2_",year)
+    
+    # save column data to data frame
+    Accuracy_df = cbind(Accuracy_df,Accuracy_list)
+    
+    # rename
+    colnames(Accuracy_df)[ncol(Accuracy_df)] = col_name
+  }
+  
+  # store the accuracy dataframe
+  Accuracy_df = Accuracy_df[,-c(1)]
+  
+  # check the Accuracy_df
+  View(Accuracy_df)
+  
+  # save the Accuracy_df
+  write.xlsx(Accuracy_df, out_path, sheetName = paste0("AfQrMore0_Accuracy_l2"), 
+                append = FALSE)
+  
+}
+```
+
+### Call the verification function
+
+```{R}
+in_path = "E:/Out_pop/PopCount_more0_afqr/Af_Qr_clust_more0_1990to2020_L2.xlsx"
+out_path = paste0("F:/Code/R_file/2022_12/Country_cluster/",
+                  "/validate_output/Accuracy_more0_AfQr_90to20_L2.xlsx")
+
+GetSingleModelValidation_l2(in_path,out_path)
+
+```

@@ -1,0 +1,468 @@
+---
+title: "Curve similarity calculation and plot"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+# 0 load package
+
+```{R}
+# load the readxl package
+library(readxl)
+library(ggplot2)
+library(tidyverse)
+library(reshape2)
+library(dtw)
+library(gridExtra)
+library(patchwork)
+library(ggpubr)
+library(ggtext)
+
+library(scales)
+library(cowplot)
+```
+
+# 1 get df 
+## 1.1 get df 00-20
+
+```{R}
+# read the Excel file into a list of data frames
+file = "pop_3set_00to20.xlsx"
+data_list <- lapply(excel_sheets(file), function(sheet) {
+  read_excel(file, sheet)
+})
+
+get_WorldPop_df = function(){
+  # extract the desired column from each data frame
+  WorldPop_list <- lapply(data_list, function(df) df$WorldPop)
+  
+  # combine the extracted columns into a single data frame
+  WorldPop_df <- do.call(cbind, WorldPop_list)
+  
+  
+  # add the SOC in front of value
+  getSOC = read_excel(file, sheet="year2000")
+  WorldPop_df <- data.frame(cbind(getSOC$SOC,WorldPop_df))
+  
+  # rename df
+  colnames(WorldPop_df) = c("SOC",2000:2020)
+  #View(WorldPop_df)
+  
+  return(WorldPop_df)
+}
+
+get_LandScan_df = function(){
+  # extract the desired column from each data frame
+  LandScan_list <- lapply(data_list, function(df) df$LandScan)
+  
+  # combine the extracted columns into a single data frame
+  LandScan_df <- do.call(cbind, LandScan_list)
+  
+  
+  # add the SOC in front of value
+  getSOC = read_excel(file, sheet="year2000")
+  LandScan_df <- data.frame(cbind(getSOC$SOC,LandScan_df))
+  
+  # rename df
+  colnames(LandScan_df) = c("SOC",2000:2020)
+  #View(LandScan_df)
+  
+  return(LandScan_df)
+}
+
+get_GPW_df = function(){
+  # extract the desired column from each data frame
+  GPW_list <- lapply(data_list, function(df) df$GPW)
+  
+  # combine the extracted columns into a single data frame
+  GPW_df <- do.call(cbind, GPW_list)
+  
+  
+  # add the SOC in front of value
+  getSOC = read_excel(file, sheet="year2000")
+  GPW_df <- data.frame(cbind(getSOC$SOC,GPW_df))
+  
+  # rename df
+  colnames(GPW_df) = c("SOC",2000:2020)
+  #View(GPW_df)
+  
+  return(GPW_df)
+}
+
+get_GlobPOP_df = function(){
+  file = "E:/Out_pop/PopCount_more0_afqr/Af_Qr_clust_more0_1990to2020_Globe.xlsx"
+  GlobPOP_df = data.frame(read_excel(file, sheet="Year1990to2020"))
+  GlobPOP_df = GlobPOP_df[,c(1,12:32)]
+  
+  colnames(GlobPOP_df) = c("SOC",2000:2020)
+  #View(GlobPOP_df)
+  
+  return(GlobPOP_df)
+}
+
+get_UN_df = function(){
+  
+  # extract the desired column from each data frame
+  UN_list <- lapply(data_list, function(df) {
+    n = ncol(df)
+    df[,c(n)]}
+    )
+  
+  # combine the extracted columns into a single data frame
+  UN_df <- do.call(cbind, UN_list)
+  
+  
+  # add the SOC in front of value
+  getSOC = read_excel(file, sheet="year2000")
+  UN_df <- data.frame(cbind(getSOC$SOC,UN_df))
+  
+  # rename df
+  colnames(UN_df) = c("SOC",2000:2020)
+  #View(UN_df)
+  
+  return(UN_df)
+}
+```
+
+
+## 1.3 get df 90-00
+```{R}
+# read the Excel file into a list of data frames
+file = "pop_3set_90to99.xlsx"
+data_list <- lapply(excel_sheets(file), function(sheet) {
+  read_excel(file, sheet)
+})
+
+get_Grump_df = function(){
+  # extract the desired column from each data frame
+  Grump_list <- lapply(data_list, function(df) df$Grump)
+  
+  # combine the extracted columns into a single data frame
+  Grump_df <- do.call(cbind, Grump_list)
+  
+  
+  # add the SOC in front of value
+  getSOC = read_excel(file, sheet="year1990")
+  Grump_df <- data.frame(cbind(getSOC$SOC,Grump_df))
+  
+  # rename df
+  colnames(Grump_df) = c("SOC",1990:1999)
+  #View(Grump_df)
+  
+  return(Grump_df)
+}
+
+get_GHS_df = function(){
+  # extract the desired column from each data frame
+  GHS_list <- lapply(data_list, function(df) df$GHS)
+  
+  # combine the extracted columns into a single data frame
+  GHS_df <- do.call(cbind, GHS_list)
+  
+  
+  # add the SOC in front of value
+  getSOC = read_excel(file, sheet="year1990")
+  GHS_df <- data.frame(cbind(getSOC$SOC,GHS_df))
+  
+  # rename df
+  colnames(GHS_df) = c("SOC",1990:1999)
+  #View(GHS_df)
+  
+  return(GHS_df)
+}
+
+get_GPW_df = function(){
+  # extract the desired column from each data frame
+  GPW_list <- lapply(data_list, function(df) df$GPW)
+  
+  # combine the extracted columns into a single data frame
+  GPW_df <- do.call(cbind, GPW_list)
+  
+  
+  # add the SOC in front of value
+  getSOC = read_excel(file, sheet="year1990")
+  GPW_df <- data.frame(cbind(getSOC$SOC,GPW_df))
+  
+  # rename df
+  colnames(GPW_df) = c("SOC",1990:1999)
+  #View(GPW_df)
+  
+  return(GPW_df)
+}
+
+get_GlobPOP_df = function(){
+  file = "Af_Qr_clust_more0_1990to2020_Globe.xlsx"
+  GlobPOP_df = data.frame(read_excel(file, sheet="Year1990to2020"))
+  GlobPOP_df = GlobPOP_df[,c(1:11)]
+  
+  colnames(GlobPOP_df) = c("SOC",1990:1999)
+
+  
+  return(GlobPOP_df)
+}
+
+get_UN_df = function(){
+  
+  # extract the desired column from each data frame
+  UN_list <- lapply(data_list, function(df) {
+    n = ncol(df)
+    df[,c(n)]}
+    )
+  
+  # combine the extracted columns into a single data frame
+  UN_df <- do.call(cbind, UN_list)
+  
+  
+  # add the SOC in front of value
+  getSOC = read_excel(file, sheet="year1990")
+  UN_df <- data.frame(cbind(getSOC$SOC,UN_df))
+  
+  # rename df
+  colnames(UN_df) = c("SOC",1990:1999)
+  #View(UN_df)
+  
+  return(UN_df)
+}
+```
+
+
+# 2 curve plot
+
+
+## 2.1 curve 90-20
+
+```{R}
+
+plot_country_compare_3 = function(name){
+  
+  name_soc = name
+  path = "Eightcurve_90to20.xlsx"
+  file = read_excel(path, sheet = name_soc)
+
+  # Population time series curves for plotting
+  df_melt = data.frame(file)
+  #View(df_melt)
+
+  # specify the factor levels in the order you want
+  df_melt$variable <-factor(df_melt$variable, 
+                             levels = c("Census",  "GRUMP","GlobPOP","GHS-POP",
+                                        "GPW","LandScan","WorldPop"))
+  if (( name_soc == "JPN") | (name_soc == "CHN")) {
+    ylab = "Population Count"
+  } else{
+    ylab = NULL
+  }
+  
+  mycolor = c("#02818a", 
+             "#6baed6", 
+              "#d94801",
+              "#fec44f", 
+              "#74c476", 
+              "#0c2c84",
+              "#6a51a3") 
+  
+  # Plot curves and DTW distances
+  print(paste0("my SOC is ", name_soc))
+  
+  p1 = ggplot(df_melt, aes(x = year, y = value , color = variable)) +
+    geom_point(data = df_melt[df_melt$variable != "Census", ],size = 1) +
+    geom_line(data = df_melt[df_melt$variable == "Census", ],
+              linetype = "solid",
+              size = 0.5,
+    ) + 
+    theme_minimal() +
+    
+    labs(title =  name_soc,
+         color=NULL,
+         x = "",
+         y = ylab) +
+    coord_cartesian(clip = "off") +
+    scale_x_continuous(
+      limits = c(1990, 2020),
+      breaks = seq(1990, 2020, by = 5),
+      labels = function(x) {
+        as.integer(x)
+      }
+    ) +
+    scale_y_continuous(labels = label_number(suffix = " e+06", scale = 1e-6))+
+
+    scale_color_manual(values = mycolor)+
+    theme(
+      title = element_text(size = 12,face = "bold"),
+      axis.title = element_text(size = 10),
+      axis.text = element_text(size = 10),
+      legend.text = element_text(size = 12)
+      
+    )
+  
+  
+  return(p1)
+}
+
+```
+
+### plot 
+
+```{R}
+SOC_lists = c("JPN","DEU","USA","PRT","CHN","LBR","GUY","LBN")
+
+p1 = plot_country_compare_3(SOC_lists[1])
+p2 = plot_country_compare_3(SOC_lists[2])
+p3 = plot_country_compare_3(SOC_lists[3])
+p4 = plot_country_compare_3(SOC_lists[4])
+p5 = plot_country_compare_3(SOC_lists[5])
+p6 = plot_country_compare_3(SOC_lists[6])
+p7 = plot_country_compare_3(SOC_lists[7])
+p8 = plot_country_compare_3(SOC_lists[8])
+
+
+ggarrange(p1, p2, p3,p4,p5,p6,p7,p8,
+          ncol=4, nrow=2, common.legend = TRUE, legend="bottom")
+
+# save plot with a single legend
+png_file = paste0("E:/Out_Fig/Fig_jpg_300dpi/curve/","eight_country_curves.png")
+
+ggsave(png_file, plot = last_plot(), device = "png", dpi = 300, scale = 1,
+       width = 15, height = 8, units = "in")
+
+
+jpg_file = paste0("E:/Out_Fig/Fig_jpg_300dpi/curve/","eight_country_curves.jpg")
+ggsave(jpg_file, plot = last_plot(), device = "jpg", dpi = 300, scale = 1,
+       width = 15, height = 8, units = "in")
+```
+
+
+
+
+
+### dtw
+
+```{R}
+plot_dtw_compare_3 = function(namelist) {
+  path = "Eightcurve_90to20.xlsx"
+
+  for (i in 1:8) {
+    name_soc = namelist[i]
+    # name_soc = SOC_lists[i]
+    file = read_excel(path, sheet = name_soc)
+    
+    # 用于绘制的人口时间序列曲线
+    df_melt = data.frame(file)
+    
+    
+    # 只能计算LS、WP、GlobPOP
+    df_melt = df_melt[(
+      df_melt$variable != "GRUMP" &
+        df_melt$variable != "GHS-POP" &
+        df_melt$variable != "GPW"
+    ), ]
+    # 只能计2000-2020
+    df_melt = df_melt[(df_melt$year > 1999 &
+                         df_melt$year < 2021), ]
+    
+    
+    # Calculate DTW distance for each curve relative to the reference curve
+    dtw_dist <- sapply(unique(df_melt$variable), function(x) {
+      dtw(df_melt[df_melt$variable == "Census", "value"],
+          df_melt[df_melt$variable == x, "value"])$distance
+    })
+    # Combine distance values with curve names into a data frame
+    dtw_df <-
+      data.frame(variable = unique(df_melt$variable)[-length(df_melt$variable)],
+                 dtw_dist = dtw_dist)
+    
+    # create text labels by pasting values together
+    # dtw_df = dtw_df[-c(ncol(dtw_df)), ] # 去掉censu =0的那一行
+    label <- c(name_soc, name_soc, name_soc,name_soc) # 添加SOC作为label
+
+
+    if (i == 1) {
+      dtw_df_merge = cbind(dtw_df, label)
+    }
+    else{
+      temp =  cbind(dtw_df, label)
+      dtw_df_merge = rbind(dtw_df_merge, temp)
+    }
+
+  }
+  
+  
+  View(dtw_df_merge)
+  return(dtw_df_merge)
+  
+}
+
+```
+
+### dtw_plot
+
+```{R}
+dtw_df = plot_dtw_compare_3(SOC_lists)
+
+# specify the factor levels in the order you want
+dtw_df$label <-factor(dtw_df$label, 
+                             levels = SOC_lists)
+  
+
+# Grouped
+dtw_p = ggplot(dtw_df, aes(fill=variable, 
+                            y=dtw_dist, 
+                            x=label)) + 
+    geom_bar(data = dtw_df[dtw_df$variable != "Census", ],
+             position="dodge", stat="identity",
+             size =1)+
+  labs( fill=NULL,
+         x = "",
+         y = "DTW distances") +
+  scale_fill_manual(values = c("#fc8d59", "#ffffbf", "#91bfdb"))+
+  theme_minimal() +
+  theme(
+      #plot.margin = margin(1, 1, 1, 1, "cm"),
+      legend.position = "bottom",#"none",
+      legend.box = "horizontal",
+      #legend.margin = margin(0, 0, -0.5, 0, "cm"),
+      title = element_text(size = 12,face = "bold"),
+      axis.title = element_text(size = 10),
+      axis.text = element_text(size = 10),
+      axis.text.x = element_text(size = 10),
+      legend.text = element_text(size = 12)
+      
+    )
+
+```
+
+
+## 2.2 Combine plot
+
+```{R}
+# Create a text grob
+
+Curve_plot = ggarrange(p1, p2, p3,p4,p5,p6,p7,p8,
+          ncol=4, nrow=2, common.legend = TRUE, legend="bottom")
+
+
+ggarrange(Curve_plot,dtw_p,
+          labels = c("(a)", "(b)"),
+          font.label = list(size = 12, 
+                            face = "bold", 
+                            color ="black"),
+          nrow = 2,
+         heights= c(6, 4))
+
+
+# save plot with a single legend
+png_file = paste0("E:/Out_Fig/Fig_jpg_300dpi/curve/","Fig3_eight_country_curves.png")
+
+ggsave(png_file, plot = last_plot(), device = "png", dpi = 300, scale = 1,
+       width = 18, height = 10, units = "in")
+
+
+jpg_file = paste0("E:/Out_Fig/Fig_jpg_300dpi/curve/","Fig3_eight_country_curves.jpg")
+ggsave(jpg_file, plot = last_plot(), device = "jpg", dpi = 300, scale = 1,
+       width = 18, height = 10, units = "in")
+```
+
+
+
+
+
