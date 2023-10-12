@@ -6,7 +6,7 @@ https://doi.org/10.5281/zenodo.8019392
 The input datasets and census data are all available on their official website. The programs used to generate and validate the gridded population dataset were GRASS GIS (8.2) and RStuido (2022.07.2). The zonal statistics were performed at QGIS (3.22). All software needs to be installed in Windows 10.
 
 ## Data Records
-The continuous global gridded population product (GlobPOP 1990-2020) in the WGS84 coordinate system with a spatial resolution of 30 arcseconds (approximately 1km in equator) can be freely accessed at https://doi.org/10.5281/zenodo.781330235, which is stored as the GeoTIFF format for each year.   
+The continuous global gridded population product (GlobPOP 1990-2020) in the WGS84 coordinate system with a spatial resolution of 30 arcseconds (approximately 1km in equator) can be freely accessed at https://doi.org/10.5281/zenodo.7813302, which is stored as the GeoTIFF format for each year.   
 There are two population formats, one is the 'Count'(Population count per grid) and another is the 'Density'(Population count per square kilometer each grid). The current version of the product spans the globe from 90N latitude to 90S.
 
 Each GeoTIFF filename has 5 fields that are separated by an underscore "_". A filename extension follows these fields. 
