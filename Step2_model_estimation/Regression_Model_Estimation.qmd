@@ -22,15 +22,21 @@ editor_options:
 # load package
 library(readxl)
 library(xlsx)
-library(cluster)
 library(tidyverse)
+library(factoextra)
+
+# perform cluster analysis
 library(quantreg)
 library(Metrics)
-library(factoextra)
+library(cluster)
 
 # perform Ridge regression in GLM and QRM, use the "glmnet" and "qrnn" packages
 library(glmnet)
 library(qrnn)
+
+# perform Non-negative optiomal constraint
+library(nnls)
+
 ```
 
 ## 1.2 load annual pop products and census data(WPP 2022 by UN)
@@ -136,22 +142,24 @@ train_df = year1990
 
 ### 2.1.1 Calculate indicators
 
+We selected four key indexes, namely the APE (Absolute Percentage Error), SE (Squared Error), SLE (Squared Logarithmic Error), and Dif (Difference) indexes. These indexes were chosen to facilitate a comprehensive comparison between different population data products and the corresponding census data in cluster analysis.
+
 ```{R }
 getIndex_9099 = function(df){
   df = df %>%
-    # 计算APE = （Actual - Predict）/ Actual
+    # APE = （Actual - Predict）/ Actual
     mutate(
       APE_Grump = abs(UN -Grump ) / UN,
       APE_GPW = abs(UN -GPW ) / UN,
       APE_GHS = abs(UN -GHS ) / UN
     ) %>%
-    # 计算SE = （Actual - Predict）^2
+    # SE = （Actual - Predict）^2
     mutate(
       SE_Grump = (UN -Grump )**2,
       SE_GPW = (UN -GPW )**2,
       SE_GHS = (UN -GHS )**2
   ) %>%
-    # 计算SLE = ( ln(1+x)-ln(1+y))^2
+    # SLE = ( ln(1+x)-ln(1+y))^2
     mutate(
       SLE_Grump = ( log(1+UN) - log(1+Grump) ) ** 2,
       SLE_GPW = ( log(1+UN) - log(1+GPW) ) ** 2,
@@ -168,7 +176,7 @@ getIndex_9099 = function(df){
 }
 getIndex_2000 = function(df){
   df = df %>%
-    # 1 计算APE = （Actual - Predict）/ Actual
+    # 1 APE = （Actual - Predict）/ Actual
     mutate(
       APE_Grump = abs(UN -Grump ) / UN,
       APE_GPW = abs(UN -GPW ) / UN,
@@ -176,7 +184,7 @@ getIndex_2000 = function(df){
       APE_LS = abs(UN -LS ) / UN,
       APE_WP = abs(UN -WP ) / UN
     ) %>%
-    # 2 计算SE = （Actual - Predict）^2
+    # 2 SE = （Actual - Predict）^2
     mutate(
       SE_Grump = (UN -Grump )**2,
       SE_GPW = (UN -GPW )**2,
@@ -184,7 +192,7 @@ getIndex_2000 = function(df){
       SE_LS = (UN -LS )**2,
       SE_WP = (UN -WP )**2
   ) %>%
-    # 3 计算SLE = ( ln(1+x)-ln(1+y))^2
+    # 3 SLE = ( ln(1+x)-ln(1+y))^2
     mutate(
       SLE_Grump = ( log(1+UN) - log(1+Grump) ) ** 2,
       SLE_GPW = ( log(1+UN) - log(1+GPW) ) ** 2,
@@ -192,7 +200,7 @@ getIndex_2000 = function(df){
       SLE_LS = ( log(1+UN) - log(1+LS) ) ** 2,
       SLE_WP = ( log(1+UN) - log(1+WP) ) ** 2
   ) %>%
-    # 4 计算Dif = （ Predict - Actual）
+    # 4 Dif = （ Predict - Actual）
     mutate(
       Dif_Grump = ( Grump - UN),
       Dif_GPW = ( GPW - UN),
@@ -205,19 +213,19 @@ getIndex_2000 = function(df){
 }
 getIndex_0120 = function(df){
   df = df %>%
-    # 计算APE = （Actual - Predict）/ Actual
+    # APE = （Actual - Predict）/ Actual
     mutate(
       APE_WP = abs(UN -WP ) / UN,
       APE_LS = abs(UN -LS ) / UN,
       APE_GPW = abs(UN -GPW ) / UN
     ) %>%
-    # 计算SE = （Actual - Predict）^2
+    # SE = （Actual - Predict）^2
     mutate(
       SE_WP = (UN -WP )**2,
       SE_LS = (UN -LS )**2,
       SE_GPW = (UN -GPW )**2
   ) %>%
-    # 计算SLE = ( ln(1+x)-ln(1+y))^2
+    # SLE = ( ln(1+x)-ln(1+y))^2
     mutate(
       SLE_WP = ( log(1+UN) - log(1+WP) ) ** 2,
       SLE_LS = ( log(1+UN) - log(1+LS) ) ** 2,
@@ -265,9 +273,11 @@ z = year1990[,c(9,12,15,18)]  ls
 z = year1990[,c(10,13,16,19)]  gpw
 
 ```{R }
+
 # Get the optimal cluster numbers
 # input：data frame with indicators
 # output：optimal cluster numbers of each pop products
+
 getNClust = function(df){
   
   # normalization
@@ -621,8 +631,6 @@ The training data comes from the clustering results, and the country class with 
 
 
 ```{R }
-# train data：unclustered 
-train.data_whole  <- train_df[,c(4:7)] # year = 1990
 
 # train data：clustered-better
 getData_9099 = function(df,year){
@@ -848,6 +856,205 @@ Model_name = c("glm","rq")
 
 
 ```
+Optimize QR Model with Non-Negativity Constraints
+
+```{R}
+# Define the quantile regression function to be optimized
+quantile_loss <- function(coefs, data, quantile) {
+  y <- data$UN
+  # X <- data[ , -c("UN")]
+  # Select all columns except "UN"
+  X <- data %>% select(-UN)
+  
+  X <- as.matrix(X)
+  coefs <- as.numeric(coefs)
+  
+  # Calculate the quantile loss function with non-negativity constraint
+  quantile_loss <- sum(pmax(y - X %*% coefs, 0)) * quantile +
+                  sum(pmax(X %*% coefs - y, 0)) * (1 - quantile)
+  return(quantile_loss)
+}
+
+
+
+# Set up for non-negativity constraints
+variables <- colnames(train.data %>% select(-UN) )
+
+
+# Create an empty data frame to store the results
+results_df_0120 <- data.frame(
+  Initial_Quantile = numeric(0),
+  GPW_Coefficient = numeric(0),
+  LS_Coefficient = numeric(0),
+  WP_Coefficient = numeric(0),
+  Model_Convergence = numeric(0)
+)
+
+results_df_00 <- data.frame(
+  Initial_Quantile = numeric(0),
+  GPW_Coefficient = numeric(0),
+  LS_Coefficient = numeric(0),
+  WP_Coefficient = numeric(0),
+  GHS_Coefficient = numeric(0),
+  Grump_Coefficient = numeric(0),
+  Model_Convergence = numeric(0)
+)
+
+results_df_9099 <- data.frame(
+  Initial_Quantile = numeric(0),
+  Grump_Coefficient = numeric(0),
+  GPW_Coefficient = numeric(0),
+  GHS_Coefficient = numeric(0),
+  Model_Convergence = numeric(0)
+)
+
+optimize_quantile_Manu_0120 = function(initial_quantile,train.data,
+                                  quantile_loss,variables,
+                                  results_df){
+  
+  initial_coefs <- c(0.1, 0.1, 0.1)  # For 2001-2020
+  
+  # Optimize the QR model with non-negativity constraints
+  result <- optim(par = initial_coefs, 
+                fn = quantile_loss, 
+                data = train.data, 
+                quantile = initial_quantile, 
+                # Specifies the optimization method or algorithm to use.
+                # L-BFGS-B is often a good default choice for constrained optimization problems, 
+                # especially when you have bounds on the parameter values. It's efficient and reliable.
+                method = "L-BFGS-B", 
+                # To enforce non-negativity, set lower bounds to 0
+                # lower = 0, 
+                lower = c(0, 0, 0),
+                # A list of control parameters for the optimization algorithm. 
+                # For example: set the maximum number of iterations with maxit
+                control = list(maxit = 10000) )
+  
+  # coefs_with_variables <- data.frame(Variable = variables, 
+  #                                  Initial_Coefs = initial_coefs, 
+  #                                  Coefficient = sprintf("%.3f", result$par))
+  coefs_with_variables <- data.frame(
+    Initial_Quantile = initial_quantile,
+    GPW_Coefficient = round(result$par,3)[1],
+    LS_Coefficient = round(result$par,3)[2],
+    WP_Coefficient = round(result$par,3)[3],
+    Model_Convergence = result$convergence
+  )
+  
+  results_df <- rbind(results_df, coefs_with_variables)
+  
+  print("----------------------------------------------")
+  print(paste0("The initial quantile: ",initial_quantile))
+  print(coefs_with_variables)
+  print(paste0("The model convergence: ",result$convergence,
+             " (`0` means that the optimization process converged successfully)."))
+  
+  return(results_df)
+}
+
+
+optimize_quantile_Manu_00 = function(initial_quantile,train.data,
+                                  quantile_loss,variables,
+                                  results_df_00){
+  
+  initial_coefs <- c(0.1, 0.1, 0.1, 0.1, 0.1)  # For 2000
+  
+  # Optimize the QR model with non-negativity constraints
+  result <- optim(par = initial_coefs, 
+                fn = quantile_loss, 
+                data = train.data, 
+                quantile = initial_quantile, 
+                method = "L-BFGS-B", 
+                lower = c(0, 0, 0, 0, 0),
+                control = list(maxit = 10000) )
+  
+  coefs_with_variables <- data.frame(
+    Initial_Quantile = initial_quantile,
+    GPW_Coefficient = round(result$par,3)[1],
+    LS_Coefficient = round(result$par,3)[2],
+    WP_Coefficient = round(result$par,3)[3],
+    GHS_Coefficient = round(result$par,3)[4],
+    Grump_Coefficient = round(result$par,3)[5],
+    Model_Convergence = result$convergence
+  )
+  
+  results_df_00 <- rbind(results_df_00, coefs_with_variables)
+  
+  print("-----------------------------------------------")
+  print(paste0("The initial quantile: ",initial_quantile))
+  print(coefs_with_variables)
+  print(paste0("The model convergence: ",result$convergence,
+             " (`0` means that the optimization process converged successfully)."))
+  
+  return(results_df_00)
+}
+
+
+optimize_quantile_Manu_9099 = function(initial_quantile,train.data,
+                                  quantile_loss,variables,
+                                  results_df){
+  
+  initial_coefs <- c(0.1, 0.1, 0.1)  # For 1990-1999
+  
+  # Optimize the QR model with non-negativity constraints
+  result <- optim(par = initial_coefs, 
+                fn = quantile_loss, 
+                data = train.data, 
+                quantile = initial_quantile, 
+                method = "L-BFGS-B", 
+                lower = c(0, 0, 0),
+                control = list(maxit = 10000) )
+
+  coefs_with_variables <- data.frame(
+    Initial_Quantile = initial_quantile,
+    Grump_Coefficient = round(result$par,3)[1],
+    GPW_Coefficient = round(result$par,3)[2],
+    GHS_Coefficient = round(result$par,3)[3],
+    Model_Convergence = result$convergence
+  )
+  
+  results_df <- rbind(results_df, coefs_with_variables)
+  
+  print("-----------------------------------------------")
+  print(paste0("The initial quantile: ",initial_quantile))
+  print(coefs_with_variables)
+  print(paste0("The model convergence: ",result$convergence,
+             " (`0` means that the optimization process converged successfully)."))
+  
+  return(results_df)
+}
+
+
+quantiles <-  seq(0.01, 1, by = 0.01)
+
+for(i in quantiles){
+  
+  # 2001-2020
+  results_df_0120  = optimize_quantile_Manu_0120(i,train.data,
+                                       quantile_loss,variables,
+                                       results_df_0120)
+
+  # 2000
+  # results_df_00  = optimize_quantile_Manu_00(i,train.data,
+  #                                      quantile_loss,variables,
+  #                                      results_df_00)
+
+  # 1990-1999
+  # results_df_9099  = optimize_quantile_Manu_9099(i,train.data,
+  #                                      quantile_loss,variables,
+  #                                      results_df_9099)
+  
+}
+# save the results_df
+result_table_path = ""
+write.xlsx(results_df_0120, result_table_path, 
+           sheetName = paste0("Coefficient_",year), append = TRUE,
+           row.names = FALSE)
+
+```
+
+
+
 ### 2.2.3 Accuracy test
 
 ```{R}
@@ -916,6 +1123,7 @@ Accuracy_list
 
 # Input: training data frame, training times, model name, training year, population products dataframe
 # Output: Print the four precision indicators and the population product coefficient of the corresponding year
+
 Train_repeat = function(df,train_times,name,year,pop){
 
   # Internal parameter definition
@@ -1081,7 +1289,6 @@ Train_repeat = function(df,train_times,name,year,pop){
 
 #### 2.2.4.1 multiple years of training
 ```{R}
-setwd("F:/Code/R_file/2022_12/Country_cluster/")
 
 # 1990:1999
 for (annum in 1990:1999) {
@@ -1166,8 +1373,7 @@ get_t_times_accuracy = function(t) {
   
   # 2000
   getOutput_2000 = function (annum) {
-    filepath = paste0("F:/Code/R_file/2022_12/Country_cluster/",
-                      "pop_3set_00to20.xlsx")
+    filepath = paste0("pop_3set_00to20.xlsx")
     year1990 <- read_excel(filepath, sheet = paste0('year', 2000))
     
     
@@ -1190,8 +1396,7 @@ get_t_times_accuracy = function(t) {
   
   # 2001:2020
   for (annum in 2001:2020) {
-    filepath = paste0("F:/Code/R_file/2022_12/Country_cluster/",
-                      "pop_3set_00to20.xlsx")
+    filepath = paste0("pop_3set_00to20.xlsx")
     year1990 <- read_excel(filepath, sheet = paste0('year', annum))
     
     year1990 =  tidyDF_0120(year1990)
@@ -1224,7 +1429,7 @@ for (i in train_times) {
 #### 2 Fetch results to table
 
 ```{R}
-txt_path = paste0("E:/Out_Fig/Fig_table/Fig_A4_repeat_training_best_times")
+txt_path = paste0("Fig_repeat_training_best_times")
 setwd(txt_path)
 
 files <- list.files(txt_path,pattern = "*.txt") #,full.names = TRUE
