@@ -20,4 +20,4 @@ Field 4: Year "1990"
 Field 5: Data type is I32(Int 32) or F32(Float32)  
 
 ## GlobPOP for time-series analysis
-To validate the temporal accuracy of GlobPOP at the country level, we have developed an interactive web application, accessible at https://globpop.shinyapps.io/GlobPOP/, where data users can explore the country level population tim-series curve of interest and compare them with census data.
+To validate the temporal accuracy of GlobPOP at the country level, we have developed an interactive web application, accessible at https://globpop.shinyapps.io/GlobPOP/, where data users can explore the country level population time-series curves of interest and compare them with census data.
